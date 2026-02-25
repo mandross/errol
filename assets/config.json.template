@@ -20,7 +20,7 @@
     },
     "report_config": {
         "email_to": "",
-        "weekly_digest_enabled": true,
+        "report_frequency": "both",
         "weekly_digest_weekday": 0,
         "weekly_digest_state_file": "./assets/weekly_digest_state.json"
     }

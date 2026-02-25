@@ -175,7 +175,11 @@ if __name__ == "__main__":
     run_report_text = format_run_report(run_stats)
     LOG.info("\n%s", run_report_text)
 
-    if report_email:
+    report_frequency = config.report_config.report_frequency
+    wants_daily_report = report_frequency in ("daily", "both")
+    wants_weekly_digest = report_frequency in ("weekly", "both")
+
+    if report_email and wants_daily_report:
         summary_subject = f"Errol run summary ({datetime.now().strftime('%Y-%m-%d %H:%M')})"
         summary_send_error = send_text_email(
             target_email=report_email,
@@ -186,7 +190,7 @@ if __name__ == "__main__":
         if summary_send_error:
             LOG.error("%s", summary_send_error)
 
-    if config.report_config.weekly_digest_enabled and report_email:
+    if wants_weekly_digest and report_email:
         state_file = config.report_config.weekly_digest_state_file
         record_run_in_weekly_state(state_file, run_stats)
         digest_payload = maybe_prepare_weekly_digest(

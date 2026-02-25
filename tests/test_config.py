@@ -237,7 +237,7 @@ def test_load_configuration_accepts_report_config(tmp_path):
         },
         "report_config": {
             "email_to": "  reports@example.com  ",
-            "weekly_digest_enabled": True,
+            "report_frequency": "both",
             "weekly_digest_weekday": 0,
             "weekly_digest_state_file": " ./state.json ",
         },
@@ -246,6 +246,7 @@ def test_load_configuration_accepts_report_config(tmp_path):
 
     loaded = load_configuration(str(config_path))
     assert loaded.report_config.email_to == "reports@example.com"
+    assert loaded.report_config.report_frequency == "both"
     assert loaded.report_config.weekly_digest_state_file == "./state.json"
 
 
@@ -273,7 +274,7 @@ def test_load_configuration_rejects_invalid_report_weekday(tmp_path):
         },
         "report_config": {
             "email_to": "reports@example.com",
-            "weekly_digest_enabled": True,
+            "report_frequency": "both",
             "weekly_digest_weekday": 7,
             "weekly_digest_state_file": "./state.json",
         },
@@ -282,3 +283,108 @@ def test_load_configuration_rejects_invalid_report_weekday(tmp_path):
 
     with pytest.raises(ValueError, match="weekly_digest_weekday"):
         load_configuration(str(config_path))
+
+
+def test_load_configuration_rejects_invalid_report_frequency(tmp_path):
+    config_path = tmp_path / "config.json"
+    config_data = {
+        "version": CONFIGURATION_VERSION,
+        "mail_config": {
+            "email_server": "imap.example.com",
+            "email_user": "user@example.com",
+            "email_password": "secret",
+            "imap_port": 993,
+            "smtp_port": 465,
+            "forward_to": "ops@example.com",
+            "spam_forward_to": "spam@example.com",
+            "inbox_folder": "INBOX",
+            "non_spam_folder": "Processed/NonSpam",
+            "spam_folder": "Processed/Spam",
+        },
+        "llm_config": {
+            "api_key": "dummy",
+            "model": "gpt-4.1-mini",
+            "instructions": "classify",
+            "prompt_template": "Content: {content}",
+        },
+        "report_config": {
+            "email_to": "reports@example.com",
+            "report_frequency": "hourly",
+            "weekly_digest_weekday": 0,
+            "weekly_digest_state_file": "./state.json",
+        },
+    }
+    config_path.write_text(json.dumps(config_data), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="report_frequency"):
+        load_configuration(str(config_path))
+
+
+def test_load_configuration_accepts_report_frequency_none(tmp_path):
+    config_path = tmp_path / "config.json"
+    config_data = {
+        "version": CONFIGURATION_VERSION,
+        "mail_config": {
+            "email_server": "imap.example.com",
+            "email_user": "user@example.com",
+            "email_password": "secret",
+            "imap_port": 993,
+            "smtp_port": 465,
+            "forward_to": "ops@example.com",
+            "spam_forward_to": "spam@example.com",
+            "inbox_folder": "INBOX",
+            "non_spam_folder": "Processed/NonSpam",
+            "spam_folder": "Processed/Spam",
+        },
+        "llm_config": {
+            "api_key": "dummy",
+            "model": "gpt-4.1-mini",
+            "instructions": "classify",
+            "prompt_template": "Content: {content}",
+        },
+        "report_config": {
+            "email_to": "reports@example.com",
+            "report_frequency": "none",
+            "weekly_digest_weekday": 0,
+            "weekly_digest_state_file": "./state.json",
+        },
+    }
+    config_path.write_text(json.dumps(config_data), encoding="utf-8")
+
+    loaded = load_configuration(str(config_path))
+    assert loaded.report_config.report_frequency == "none"
+
+
+def test_load_configuration_accepts_legacy_weekly_digest_flag(tmp_path):
+    config_path = tmp_path / "config.json"
+    config_data = {
+        "version": CONFIGURATION_VERSION,
+        "mail_config": {
+            "email_server": "imap.example.com",
+            "email_user": "user@example.com",
+            "email_password": "secret",
+            "imap_port": 993,
+            "smtp_port": 465,
+            "forward_to": "ops@example.com",
+            "spam_forward_to": "spam@example.com",
+            "inbox_folder": "INBOX",
+            "non_spam_folder": "Processed/NonSpam",
+            "spam_folder": "Processed/Spam",
+        },
+        "llm_config": {
+            "api_key": "dummy",
+            "model": "gpt-4.1-mini",
+            "instructions": "classify",
+            "prompt_template": "Content: {content}",
+        },
+        "report_config": {
+            "email_to": "reports@example.com",
+            "weekly_digest_enabled": False,
+            "weekly_digest_weekday": 0,
+            "weekly_digest_state_file": "./state.json",
+        },
+    }
+    config_path.write_text(json.dumps(config_data), encoding="utf-8")
+
+    loaded = load_configuration(str(config_path))
+    assert loaded.report_config.report_frequency == "daily"

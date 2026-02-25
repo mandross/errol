@@ -1,9 +1,9 @@
 import json
 import tempfile
+from typing import Literal
 from pydantic import (
     BaseModel,
     ConfigDict,
-    StrictBool,
     StrictInt,
     StrictStr,
     ValidationError,
@@ -66,7 +66,7 @@ class ReportConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     email_to: StrictStr | None = None
-    weekly_digest_enabled: StrictBool = True
+    report_frequency: Literal["none", "daily", "weekly", "both"] = "both"
     weekly_digest_weekday: StrictInt = 0
     weekly_digest_state_file: StrictStr = "./assets/weekly_digest_state.json"
 
@@ -86,6 +86,22 @@ class ReportConfig(BaseModel):
         if not 0 <= value <= 6:
             raise ValueError("weekly_digest_weekday must be between 0 (Monday) and 6 (Sunday).")
         return value
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_legacy_weekly_flag(cls, data):
+        if not isinstance(data, dict):
+            return data
+
+        if "report_frequency" in data:
+            return data
+
+        # Backward-compatible mapping for legacy configs.
+        legacy_weekly_enabled = data.pop("weekly_digest_enabled", None)
+        if isinstance(legacy_weekly_enabled, bool):
+            data["report_frequency"] = "both" if legacy_weekly_enabled else "daily"
+
+        return data
 
 
 class AppConfig(BaseModel):
