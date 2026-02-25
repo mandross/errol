@@ -54,6 +54,28 @@ python3 __main__.py -c ./assets/config.json -testing=10
 
 This processes at most `N` emails and logs each email's score with a short summary.
 
+## Email Reports
+
+You can configure errol to send short ASCII reports to an email address (for example, an email-to-Slack channel).
+
+Add `report_config` to your config:
+
+```json
+"report_config": {
+  "email_to": "reports@example.com",
+  "weekly_digest_enabled": true,
+  "weekly_digest_weekday": 0,
+  "weekly_digest_state_file": "./assets/weekly_digest_state.json"
+}
+```
+
+Behavior:
+
+- A per-run summary report is sent to `report_config.email_to`.
+- A weekly digest is sent once per week on `weekly_digest_weekday` (`0=Monday`, `6=Sunday`).
+- Weekly counters are persisted in `weekly_digest_state_file`.
+- Reports are plain-text ASCII for easy reading in email/Slack.
+
 ## Run Tests (pytest)
 
 Install pytest in your active environment:

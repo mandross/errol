@@ -1,6 +1,7 @@
 import imaplib
 import logging
 import time
+from datetime import datetime
 from openai import OpenAI
 
 from args import parse_arguments
@@ -12,8 +13,16 @@ from mailbox_handler import (
     forward_email,
     move_email_to_folder,
     open_imap_connection,
+    send_text_email,
 )
 from message_parsing import extract_text, parse_response_text
+from reporting import (
+    RunStats,
+    format_run_report,
+    mark_weekly_digest_sent,
+    maybe_prepare_weekly_digest,
+    record_run_in_weekly_state,
+)
 
 LOG = logging.getLogger("errol")
 
@@ -56,6 +65,7 @@ if __name__ == "__main__":
     config, client, testing_limit, is_testing = setup()
 
     run_errors = []
+    run_stats = RunStats()
     mailbox = None
 
     try:
@@ -78,19 +88,23 @@ if __name__ == "__main__":
                 msg, raw_message, fetch_error = fetch_email_by_id(mailbox, email_id)
                 if fetch_error:
                     run_errors.append(fetch_error)
+                    run_stats.errors += 1
                     continue
                 if msg is None or raw_message is None:
                     run_errors.append(f"Email {index}: missing parsed message after fetch.")
+                    run_stats.errors += 1
                     continue
 
                 content = extract_text(msg)
                 if not content:
                     run_errors.append(f"Email {index}: empty extracted content.")
+                    run_stats.errors += 1
                     continue
 
                 summary, category, score, analysis_error = analyze_email(client, content, config)
                 if analysis_error:
                     run_errors.append(f"Email {index}: {analysis_error}")
+                    run_stats.errors += 1
                     continue
 
                 if is_testing:   
@@ -114,13 +128,24 @@ if __name__ == "__main__":
                     )
                     if forward_error:
                         run_errors.append(f"Email {index}: {forward_error}")
+                        run_stats.errors += 1
                         continue
 
                 if target_folder:
                     move_error = move_email_to_folder(mailbox, email_id, target_folder)
                     if move_error:
                         run_errors.append(f"Email {index}: {move_error}")
+                        run_stats.errors += 1
                         continue
+
+                run_stats.processed += 1
+                if category == "spam":
+                    run_stats.spam += 1
+                elif category == "lead":
+                    run_stats.lead += 1
+                    run_stats.lead_scores.append(score)
+                else:
+                    run_stats.irrelevant += 1
 
                 LOG.info(
                     "(%s) | Category: %s, Score: %s, Forwarded to: %s, Moved to: %s | Summary: %s",
@@ -145,3 +170,37 @@ if __name__ == "__main__":
         LOG.error("Run completed with errors:")
         for err in run_errors:
             LOG.error("- %s", err)
+
+    report_email = config.report_config.email_to
+    run_report_text = format_run_report(run_stats)
+    LOG.info("\n%s", run_report_text)
+
+    if report_email:
+        summary_subject = f"Errol run summary ({datetime.now().strftime('%Y-%m-%d %H:%M')})"
+        summary_send_error = send_text_email(
+            target_email=report_email,
+            subject=summary_subject,
+            body=run_report_text,
+            config=config,
+        )
+        if summary_send_error:
+            LOG.error("%s", summary_send_error)
+
+    if config.report_config.weekly_digest_enabled and report_email:
+        state_file = config.report_config.weekly_digest_state_file
+        record_run_in_weekly_state(state_file, run_stats)
+        digest_payload = maybe_prepare_weekly_digest(
+            state_file=state_file,
+            digest_weekday=config.report_config.weekly_digest_weekday,
+        )
+        if digest_payload:
+            digest_send_error = send_text_email(
+                target_email=report_email,
+                subject=digest_payload["subject"],
+                body=digest_payload["body"],
+                config=config,
+            )
+            if digest_send_error:
+                LOG.error("%s", digest_send_error)
+            else:
+                mark_weekly_digest_sent(state_file, digest_payload["target_week_key"])

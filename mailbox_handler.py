@@ -108,6 +108,33 @@ def forward_email(
     return None
 
 
+def send_text_email(
+    target_email,
+    subject,
+    body,
+    config,
+):
+    if not target_email or not target_email.strip():
+        return "SMTP: no report target configured."
+
+    report_message = EmailMessage()
+    report_message["From"] = config.mail_config.email_user
+    report_message["To"] = target_email
+    report_message["Subject"] = subject
+    report_message.set_content(body)
+
+    try:
+        with smtplib.SMTP_SSL(config.mail_config.email_server, config.mail_config.smtp_port) as smtp:
+            smtp.login(
+                config.mail_config.email_user,
+                config.mail_config.email_password,
+            )
+            smtp.send_message(report_message)
+    except (smtplib.SMTPException, OSError, ValueError) as exc:
+        return f"SMTP: failed sending report to '{target_email}': {exc}"
+    return None
+
+
 def ensure_mailbox_folder(mailbox, folder):
     status, _ = mailbox.create(folder)
     if status in {"OK", "NO"}:

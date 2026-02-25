@@ -1,6 +1,15 @@
 import json
 import tempfile
-from pydantic import BaseModel, ConfigDict, StrictInt, StrictStr, ValidationError, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    StrictBool,
+    StrictInt,
+    StrictStr,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 CONFIGURATION_VERSION = 0
 
@@ -53,12 +62,39 @@ class LLMConfig(BaseModel):
     prompt_template: StrictStr
 
 
+class ReportConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email_to: StrictStr | None = None
+    weekly_digest_enabled: StrictBool = True
+    weekly_digest_weekday: StrictInt = 0
+    weekly_digest_state_file: StrictStr = "./assets/weekly_digest_state.json"
+
+    @field_validator("email_to", "weekly_digest_state_file", mode="before")
+    @classmethod
+    def _normalize_report_fields(cls, value):
+        if value is None:
+            return None
+        if isinstance(value, str):
+            value = value.strip()
+            return value or None
+        return value
+
+    @field_validator("weekly_digest_weekday")
+    @classmethod
+    def _validate_weekday(cls, value):
+        if not 0 <= value <= 6:
+            raise ValueError("weekly_digest_weekday must be between 0 (Monday) and 6 (Sunday).")
+        return value
+
+
 class AppConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     version: StrictInt
     mail_config: MailConfig
     llm_config: LLMConfig
+    report_config: ReportConfig = ReportConfig()
 
 
 def load_configuration(config_file):

@@ -17,5 +17,11 @@
         "model": "gpt-4.1-nano",
         "instructions": "You are a sales rep sorting emails in a company offering software services for IoT. A lead has a concrete problem to solve. Treat offers of services to us as irrelevant.",
         "prompt_template": "Summarize this email in one short sentence, classify it as spam, irrelevant, or lead, and if it's a lead, rank importance 1-10 (else rank 0).\\n\\nEmail:\\n{content}\\n\\nFormat:\\nSummary: [your summary]\\nCategory: [spam/irrelevant/lead]\\nScore: [number]"
+    },
+    "report_config": {
+        "email_to": "",
+        "weekly_digest_enabled": true,
+        "weekly_digest_weekday": 0,
+        "weekly_digest_state_file": "./assets/weekly_digest_state.json"
     }
 }
