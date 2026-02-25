@@ -53,6 +53,47 @@ def analyze_email(client, content, config):
     return summary, category, score, None
 
 
+def send_digest_email(report_email, payload, config):
+    send_error = send_text_email(
+        target_email=report_email,
+        subject=payload["subject"],
+        body=payload["body"],
+        config=config,
+    )
+    if send_error:
+        LOG.error("%s", send_error)
+        return False
+    return True
+
+
+def process_daily_digest(config, run_stats, report_email):
+    daily_state_file = config.report_config.daily_digest_state_file
+    record_run_in_daily_state(daily_state_file, run_stats)
+    daily_digest_payload = maybe_prepare_daily_digest(
+        state_file=daily_state_file,
+        send_hour=config.report_config.daily_digest_send_hour,
+    )
+    if not daily_digest_payload:
+        return
+
+    if send_digest_email(report_email, daily_digest_payload, config):
+        mark_daily_digest_sent(daily_state_file, daily_digest_payload["target_day_key"])
+
+
+def process_weekly_digest(config, run_stats, report_email):
+    state_file = config.report_config.weekly_digest_state_file
+    record_run_in_weekly_state(state_file, run_stats)
+    digest_payload = maybe_prepare_weekly_digest(
+        state_file=state_file,
+        digest_weekday=config.report_config.weekly_digest_weekday,
+    )
+    if not digest_payload:
+        return
+
+    if send_digest_email(report_email, digest_payload, config):
+        mark_weekly_digest_sent(state_file, digest_payload["target_week_key"])
+
+
 def setup():
     args = parse_arguments()
     configure_logging(args.log_level)
@@ -182,39 +223,7 @@ if __name__ == "__main__":
     wants_weekly_digest = report_frequency in ("weekly", "both")
 
     if wants_daily_report and report_email:
-        daily_state_file = config.report_config.daily_digest_state_file
-        record_run_in_daily_state(daily_state_file, run_stats)
-        daily_digest_payload = maybe_prepare_daily_digest(
-            state_file=daily_state_file,
-            send_hour=config.report_config.daily_digest_send_hour,
-        )
-        if daily_digest_payload:
-            daily_send_error = send_text_email(
-                target_email=report_email,
-                subject=daily_digest_payload["subject"],
-                body=daily_digest_payload["body"],
-                config=config,
-            )
-            if daily_send_error:
-                LOG.error("%s", daily_send_error)
-            else:
-                mark_daily_digest_sent(daily_state_file, daily_digest_payload["target_day_key"])
+        process_daily_digest(config, run_stats, report_email)
 
     if wants_weekly_digest and report_email:
-        state_file = config.report_config.weekly_digest_state_file
-        record_run_in_weekly_state(state_file, run_stats)
-        digest_payload = maybe_prepare_weekly_digest(
-            state_file=state_file,
-            digest_weekday=config.report_config.weekly_digest_weekday,
-        )
-        if digest_payload:
-            digest_send_error = send_text_email(
-                target_email=report_email,
-                subject=digest_payload["subject"],
-                body=digest_payload["body"],
-                config=config,
-            )
-            if digest_send_error:
-                LOG.error("%s", digest_send_error)
-            else:
-                mark_weekly_digest_sent(state_file, digest_payload["target_week_key"])
+        process_weekly_digest(config, run_stats, report_email)
