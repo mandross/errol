@@ -21,6 +21,8 @@
     "report_config": {
         "email_to": "",
         "report_frequency": "both",
+        "daily_digest_send_hour": 0,
+        "daily_digest_state_file": "./assets/daily_digest_state.json",
         "weekly_digest_weekday": 0,
         "weekly_digest_state_file": "./assets/weekly_digest_state.json"
     }

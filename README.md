@@ -64,6 +64,8 @@ Add `report_config` to your config:
 "report_config": {
   "email_to": "reports@example.com",
   "report_frequency": "both",
+  "daily_digest_send_hour": 0,
+  "daily_digest_state_file": "./assets/daily_digest_state.json",
   "weekly_digest_weekday": 0,
   "weekly_digest_state_file": "./assets/weekly_digest_state.json"
 }
@@ -73,7 +75,9 @@ Behavior:
 
 - `report_frequency` controls which reports are sent: `"none"`, `"daily"`, `"weekly"`, or `"both"`.
 - If `report_frequency` is `"none"`, no report emails are sent.
-- A per-run summary report is sent when `report_frequency` is `"daily"` or `"both"`.
+- A daily digest is sent when `report_frequency` is `"daily"` or `"both"`.
+- The daily digest includes aggregated stats from the previous day and is sent once, on the first run at/after `daily_digest_send_hour` (`0-23`).
+- Daily counters are persisted in `daily_digest_state_file`.
 - A weekly digest is sent when `report_frequency` is `"weekly"` or `"both"`, once per week on `weekly_digest_weekday` (`0=Monday`, `6=Sunday`).
 - Weekly counters are persisted in `weekly_digest_state_file`.
 - Reports are plain-text ASCII for easy reading in email/Slack.

@@ -73,6 +73,103 @@ def _iso_week_key(when):
     return f"{iso_year}-W{iso_week:02d}"
 
 
+def _iso_day_key(when):
+    return when.strftime("%Y-%m-%d")
+
+
+def _load_daily_state(state_file):
+    state_path = Path(state_file)
+    if not state_path.exists():
+        return {"days": {}, "last_sent_day": None}
+    try:
+        return json.loads(state_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {"days": {}, "last_sent_day": None}
+
+
+def _save_daily_state(state_file, state):
+    state_path = Path(state_file)
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def record_run_in_daily_state(state_file, stats, now=None):
+    now = now or datetime.now()
+    day_key = _iso_day_key(now)
+    state = _load_daily_state(state_file)
+    days = state.setdefault("days", {})
+    day_stats = days.setdefault(day_key, _empty_week_stats())
+
+    day_stats["processed"] += stats.processed
+    day_stats["spam"] += stats.spam
+    day_stats["irrelevant"] += stats.irrelevant
+    day_stats["lead"] += stats.lead
+    day_stats["errors"] += stats.errors
+
+    hist = day_stats.setdefault("lead_scores_hist", {str(score): 0 for score in range(1, 11)})
+    for score in stats.lead_scores:
+        if 1 <= score <= 10:
+            hist[str(score)] += 1
+
+    _save_daily_state(state_file, state)
+    return state
+
+
+def maybe_prepare_daily_digest(state_file, send_hour, now=None):
+    now = now or datetime.now()
+    if not 0 <= send_hour <= 23:
+        return None
+    if now.hour < send_hour:
+        return None
+
+    state = _load_daily_state(state_file)
+    target_day_key = _iso_day_key(now - timedelta(days=1))
+    if state.get("last_sent_day") == target_day_key:
+        return None
+
+    day_stats = state.get("days", {}).get(target_day_key, _empty_week_stats())
+    subject = f"Errol daily digest ({target_day_key})"
+    body = format_daily_digest(target_day_key, day_stats)
+    return {
+        "subject": subject,
+        "body": body,
+        "target_day_key": target_day_key,
+    }
+
+
+def mark_daily_digest_sent(state_file, day_key):
+    state = _load_daily_state(state_file)
+    state["last_sent_day"] = day_key
+    _save_daily_state(state_file, state)
+
+
+def format_daily_digest(day_key, day_stats):
+    histogram = {score: 0 for score in range(1, 11)}
+    raw_hist = day_stats.get("lead_scores_hist", {})
+    for score in range(1, 11):
+        histogram[score] = int(raw_hist.get(str(score), 0))
+
+    lead_scores_count = sum(histogram.values())
+    lead_score_sum = sum(score * count for score, count in histogram.items())
+    avg_lead_score = (lead_score_sum / lead_scores_count) if lead_scores_count else 0.0
+
+    lines = [
+        "ERROL DAILY DIGEST",
+        "==================",
+        f"Day               : {day_key}",
+        f"Processed emails  : {day_stats.get('processed', 0)}",
+        f"Spam              : {day_stats.get('spam', 0)}",
+        f"Irrelevant        : {day_stats.get('irrelevant', 0)}",
+        f"Leads             : {day_stats.get('lead', 0)}",
+        f"Errors            : {day_stats.get('errors', 0)}",
+        f"Avg lead score    : {avg_lead_score:.2f}",
+        "",
+        "Lead score histogram (1-10)",
+    ]
+    lines.extend(_format_histogram_lines(histogram))
+    return "\n".join(lines)
+
+
 def _load_weekly_state(state_file):
     state_path = Path(state_file)
     if not state_path.exists():

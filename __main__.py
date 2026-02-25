@@ -1,7 +1,6 @@
 import imaplib
 import logging
 import time
-from datetime import datetime
 from openai import OpenAI
 
 from args import parse_arguments
@@ -19,8 +18,11 @@ from message_parsing import extract_text, parse_response_text
 from reporting import (
     RunStats,
     format_run_report,
+    mark_daily_digest_sent,
     mark_weekly_digest_sent,
+    maybe_prepare_daily_digest,
     maybe_prepare_weekly_digest,
+    record_run_in_daily_state,
     record_run_in_weekly_state,
 )
 
@@ -179,16 +181,24 @@ if __name__ == "__main__":
     wants_daily_report = report_frequency in ("daily", "both")
     wants_weekly_digest = report_frequency in ("weekly", "both")
 
-    if report_email and wants_daily_report:
-        summary_subject = f"Errol run summary ({datetime.now().strftime('%Y-%m-%d %H:%M')})"
-        summary_send_error = send_text_email(
-            target_email=report_email,
-            subject=summary_subject,
-            body=run_report_text,
-            config=config,
+    if wants_daily_report and report_email:
+        daily_state_file = config.report_config.daily_digest_state_file
+        record_run_in_daily_state(daily_state_file, run_stats)
+        daily_digest_payload = maybe_prepare_daily_digest(
+            state_file=daily_state_file,
+            send_hour=config.report_config.daily_digest_send_hour,
         )
-        if summary_send_error:
-            LOG.error("%s", summary_send_error)
+        if daily_digest_payload:
+            daily_send_error = send_text_email(
+                target_email=report_email,
+                subject=daily_digest_payload["subject"],
+                body=daily_digest_payload["body"],
+                config=config,
+            )
+            if daily_send_error:
+                LOG.error("%s", daily_send_error)
+            else:
+                mark_daily_digest_sent(daily_state_file, daily_digest_payload["target_day_key"])
 
     if wants_weekly_digest and report_email:
         state_file = config.report_config.weekly_digest_state_file

@@ -67,10 +67,12 @@ class ReportConfig(BaseModel):
 
     email_to: StrictStr | None = None
     report_frequency: Literal["none", "daily", "weekly", "both"] = "both"
+    daily_digest_send_hour: StrictInt = 0
+    daily_digest_state_file: StrictStr = "./assets/daily_digest_state.json"
     weekly_digest_weekday: StrictInt = 0
     weekly_digest_state_file: StrictStr = "./assets/weekly_digest_state.json"
 
-    @field_validator("email_to", "weekly_digest_state_file", mode="before")
+    @field_validator("email_to", "daily_digest_state_file", "weekly_digest_state_file", mode="before")
     @classmethod
     def _normalize_report_fields(cls, value):
         if value is None:
@@ -85,6 +87,13 @@ class ReportConfig(BaseModel):
     def _validate_weekday(cls, value):
         if not 0 <= value <= 6:
             raise ValueError("weekly_digest_weekday must be between 0 (Monday) and 6 (Sunday).")
+        return value
+
+    @field_validator("daily_digest_send_hour")
+    @classmethod
+    def _validate_daily_send_hour(cls, value):
+        if not 0 <= value <= 23:
+            raise ValueError("daily_digest_send_hour must be between 0 and 23.")
         return value
 
     @model_validator(mode="before")
