@@ -10,12 +10,21 @@
         "spam_forward_to": "",
         "inbox_folder": "INBOX",
         "non_spam_folder": "Processed/NonSpam",
-        "spam_folder": "Processed/Spam"
+        "spam_folder": "Processed/Spam",
+        "min_non_spam_score": 8
     },
     "llm_config": {
         "api_key": "",
         "model": "gpt-4.1-nano",
         "instructions": "You are a sales rep sorting emails in a company offering software services for IoT. A lead has a concrete problem to solve. Treat offers of services to us as irrelevant.",
         "prompt_template": "Summarize this email in one short sentence, classify it as spam, irrelevant, or lead, and if it's a lead, rank importance 1-10 (else rank 0).\\n\\nEmail:\\n{content}\\n\\nFormat:\\nSummary: [your summary]\\nCategory: [spam/irrelevant/lead]\\nScore: [number]"
+    },
+    "report_config": {
+        "email_to": "",
+        "report_frequency": "both",
+        "daily_digest_send_hour": 0,
+        "daily_digest_state_file": "./assets/daily_digest_state.json",
+        "weekly_digest_weekday": 0,
+        "weekly_digest_state_file": "./assets/weekly_digest_state.json"
     }
 }

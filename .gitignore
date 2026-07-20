@@ -2,4 +2,6 @@ assets/config.json
 __pycache__
 .pytest_cache
 .venv
-venv
+assets/daily_digest_state.json
+assets/weekly_digest_state.json
+

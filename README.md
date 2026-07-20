@@ -54,6 +54,34 @@ python3 __main__.py -c ./assets/config.json -testing=10
 
 This processes at most `N` emails and logs each email's score with a short summary.
 
+## Email Reports
+
+You can configure errol to send short ASCII reports to an email address (for example, an email-to-Slack channel).
+
+Add `report_config` to your config:
+
+```json
+"report_config": {
+  "email_to": "reports@example.com",
+  "report_frequency": "both",
+  "daily_digest_send_hour": 0,
+  "daily_digest_state_file": "./assets/daily_digest_state.json",
+  "weekly_digest_weekday": 0,
+  "weekly_digest_state_file": "./assets/weekly_digest_state.json"
+}
+```
+
+Behavior:
+
+- `report_frequency` controls which reports are sent: `"none"`, `"daily"`, `"weekly"`, or `"both"`.
+- If `report_frequency` is `"none"`, no report emails are sent.
+- A daily digest is sent when `report_frequency` is `"daily"` or `"both"`.
+- The daily digest includes aggregated stats from the previous day and is sent once, on the first run at/after `daily_digest_send_hour` (`0-23`).
+- Daily counters are persisted in `daily_digest_state_file`.
+- A weekly digest is sent when `report_frequency` is `"weekly"` or `"both"`, once per week on `weekly_digest_weekday` (`0=Monday`, `6=Sunday`).
+- Weekly counters are persisted in `weekly_digest_state_file`.
+- Reports are plain-text ASCII for easy reading in email/Slack.
+
 ## Run Tests (pytest)
 
 Install pytest in your active environment:
@@ -95,5 +123,6 @@ Notes:
 - Use an absolute project path in `cd` so cron runs from the correct working directory.
 - Redirect stdout/stderr to a log file for troubleshooting.
 - `mail_config.inbox_folder` is the source mailbox folder that errol processes.
-- Spam is forwarded to `mail_config.spam_forward_to` or/and moved to `mail_config.spam_folder`.
-- Non-spam (`lead` and `irrelevant`) is forwarded to `mail_config.forward_to` or/and moved to `mail_config.non_spam_folder`.
+- Messages classified as `spam` are forwarded to `mail_config.spam_forward_to` and/or moved to `mail_config.spam_folder`.
+- Non-spam messages (`lead` or `irrelevant`) with `score >= mail_config.min_non_spam_score` (default `8`) are forwarded to `mail_config.forward_to` and/or moved to `mail_config.non_spam_folder`.
+- Below-threshold scores (including all `irrelevant` messages, which always score `0`) use the spam destinations.
