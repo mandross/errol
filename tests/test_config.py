@@ -33,6 +33,68 @@ def test_load_configuration_validates_and_loads(tmp_path):
     loaded = load_configuration(str(config_path))
     assert loaded.version == CONFIGURATION_VERSION
     assert loaded.mail_config.forward_to == "ops@example.com"
+    assert loaded.mail_config.min_non_spam_score == 8
+
+
+def test_load_configuration_accepts_min_non_spam_score_override(tmp_path):
+    config_path = tmp_path / "config.json"
+    config_data = {
+        "version": CONFIGURATION_VERSION,
+        "mail_config": {
+            "email_server": "imap.example.com",
+            "email_user": "user@example.com",
+            "email_password": "secret",
+            "imap_port": 993,
+            "smtp_port": 465,
+            "forward_to": "ops@example.com",
+            "spam_forward_to": "spam@example.com",
+            "inbox_folder": "INBOX",
+            "non_spam_folder": "Processed/NonSpam",
+            "spam_folder": "Processed/Spam",
+            "min_non_spam_score": 5,
+        },
+        "llm_config": {
+            "api_key": "dummy",
+            "model": "gpt-4.1-mini",
+            "instructions": "classify",
+            "prompt_template": "Content: {content}",
+        },
+    }
+    config_path.write_text(json.dumps(config_data), encoding="utf-8")
+
+    loaded = load_configuration(str(config_path))
+    assert loaded.mail_config.min_non_spam_score == 5
+
+
+@pytest.mark.parametrize("invalid_score", [0, 11])
+def test_load_configuration_rejects_invalid_min_non_spam_score(tmp_path, invalid_score):
+    config_path = tmp_path / "config.json"
+    config_data = {
+        "version": CONFIGURATION_VERSION,
+        "mail_config": {
+            "email_server": "imap.example.com",
+            "email_user": "user@example.com",
+            "email_password": "secret",
+            "imap_port": 993,
+            "smtp_port": 465,
+            "forward_to": "ops@example.com",
+            "spam_forward_to": "spam@example.com",
+            "inbox_folder": "INBOX",
+            "non_spam_folder": "Processed/NonSpam",
+            "spam_folder": "Processed/Spam",
+            "min_non_spam_score": invalid_score,
+        },
+        "llm_config": {
+            "api_key": "dummy",
+            "model": "gpt-4.1-mini",
+            "instructions": "classify",
+            "prompt_template": "Content: {content}",
+        },
+    }
+    config_path.write_text(json.dumps(config_data), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="min_non_spam_score"):
+        load_configuration(str(config_path))
 
 
 def test_load_configuration_accepts_folder_only_destinations(tmp_path):

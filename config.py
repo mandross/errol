@@ -27,6 +27,7 @@ class MailConfig(BaseModel):
     inbox_folder: StrictStr
     non_spam_folder: StrictStr | None
     spam_folder: StrictStr | None
+    min_non_spam_score: StrictInt = 8
 
     @field_validator("forward_to", "spam_forward_to", "non_spam_folder", "spam_folder", mode="before")
     @classmethod
@@ -36,6 +37,13 @@ class MailConfig(BaseModel):
         if isinstance(value, str):
             value = value.strip()
             return value or None
+        return value
+
+    @field_validator("min_non_spam_score")
+    @classmethod
+    def _validate_min_non_spam_score(cls, value):
+        if not 1 <= value <= 10:
+            raise ValueError("min_non_spam_score must be between 1 and 10.")
         return value
 
     @model_validator(mode="after")

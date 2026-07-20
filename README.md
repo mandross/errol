@@ -123,5 +123,6 @@ Notes:
 - Use an absolute project path in `cd` so cron runs from the correct working directory.
 - Redirect stdout/stderr to a log file for troubleshooting.
 - `mail_config.inbox_folder` is the source mailbox folder that errol processes.
-- Spam is forwarded to `mail_config.spam_forward_to` or/and moved to `mail_config.spam_folder`.
-- Non-spam (`lead` and `irrelevant`) is forwarded to `mail_config.forward_to` or/and moved to `mail_config.non_spam_folder`.
+- Messages classified as `spam` are forwarded to `mail_config.spam_forward_to` and/or moved to `mail_config.spam_folder`.
+- Non-spam messages (`lead` or `irrelevant`) with `score >= mail_config.min_non_spam_score` (default `8`) are forwarded to `mail_config.forward_to` and/or moved to `mail_config.non_spam_folder`.
+- Below-threshold scores (including all `irrelevant` messages, which always score `0`) use the spam destinations.

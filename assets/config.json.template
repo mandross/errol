@@ -10,7 +10,8 @@
         "spam_forward_to": "",
         "inbox_folder": "INBOX",
         "non_spam_folder": "Processed/NonSpam",
-        "spam_folder": "Processed/Spam"
+        "spam_folder": "Processed/Spam",
+        "min_non_spam_score": 8
     },
     "llm_config": {
         "api_key": "",

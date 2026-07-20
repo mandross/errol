@@ -53,6 +53,13 @@ def analyze_email(client, content, config):
     return summary, category, score, None
 
 
+def resolve_destinations(category, score, mail_config):
+    """Return (target_email, target_folder) for a classified message."""
+    if category != "spam" and score >= mail_config.min_non_spam_score:
+        return mail_config.forward_to, mail_config.non_spam_folder
+    return mail_config.spam_forward_to, mail_config.spam_folder
+
+
 def send_digest_email(report_email, payload, config):
     send_error = send_text_email(
         target_email=report_email,
@@ -150,16 +157,13 @@ if __name__ == "__main__":
                     run_stats.errors += 1
                     continue
 
-                if is_testing:   
+                if is_testing:
                     target_email = None
                     target_folder = None
                 else:
-                    target_email = config.mail_config.spam_forward_to
-                    target_folder = config.mail_config.spam_folder
-
-                    if category != "spam" and score > 7:
-                        target_email = config.mail_config.forward_to
-                        target_folder = config.mail_config.non_spam_folder
+                    target_email, target_folder = resolve_destinations(
+                        category, score, config.mail_config
+                    )
 
                 if target_email:
                     forward_error = forward_email(
