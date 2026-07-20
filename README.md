@@ -84,10 +84,10 @@ Behavior:
 
 ## Run Tests (pytest)
 
-Install pytest in your active environment:
+Install dev dependencies (includes runtime deps plus pytest):
 
 ```bash
-python3 -m pip install pytest
+python3 -m pip install -r requirements-dev.txt
 ```
 
 Run the test suite from project root:
