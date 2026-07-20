@@ -87,6 +87,47 @@ def _load_daily_state(state_file):
         return {"days": {}, "last_sent_day": None}
 
 
+def _is_non_empty_period_stats(period_stats):
+    tracked_counts = (
+        "processed",
+        "spam",
+        "irrelevant",
+        "lead",
+        "errors",
+    )
+    for key in tracked_counts:
+        if int(period_stats.get(key, 0)) > 0:
+            return True
+    return False
+
+
+def _is_valid_day_key(day_key):
+    try:
+        datetime.strptime(day_key, "%Y-%m-%d")
+    except ValueError:
+        return False
+    return True
+
+
+def _next_daily_digest_day_key(state, max_day_key):
+    days = state.get("days", {})
+    last_sent_day = state.get("last_sent_day")
+    candidate_keys = []
+    for day_key, day_stats in days.items():
+        if not _is_valid_day_key(day_key):
+            continue
+        if day_key > max_day_key:
+            continue
+        if last_sent_day and day_key <= last_sent_day:
+            continue
+        if not _is_non_empty_period_stats(day_stats):
+            continue
+        candidate_keys.append(day_key)
+    if not candidate_keys:
+        return None
+    return min(candidate_keys)
+
+
 def _save_daily_state(state_file, state):
     state_path = Path(state_file)
     state_path.parent.mkdir(parents=True, exist_ok=True)
@@ -123,11 +164,14 @@ def maybe_prepare_daily_digest(state_file, send_hour, now=None):
         return None
 
     state = _load_daily_state(state_file)
-    target_day_key = _iso_day_key(now - timedelta(days=1))
-    if state.get("last_sent_day") == target_day_key:
+    latest_eligible_day_key = _iso_day_key(now - timedelta(days=1))
+    target_day_key = _next_daily_digest_day_key(state, latest_eligible_day_key)
+    if target_day_key is None:
         return None
 
-    day_stats = state.get("days", {}).get(target_day_key, _empty_week_stats())
+    day_stats = state.get("days", {}).get(target_day_key)
+    if day_stats is None:
+        return None
     subject = f"Errol daily digest ({target_day_key})"
     body = format_daily_digest(target_day_key, day_stats)
     return {
@@ -180,6 +224,33 @@ def _load_weekly_state(state_file):
         return {"weeks": {}, "last_sent_week": None}
 
 
+def _is_valid_week_key(week_key):
+    try:
+        datetime.strptime(f"{week_key}-1", "%G-W%V-%u")
+    except ValueError:
+        return False
+    return True
+
+
+def _next_weekly_digest_week_key(state, max_week_key):
+    weeks = state.get("weeks", {})
+    last_sent_week = state.get("last_sent_week")
+    candidate_keys = []
+    for week_key, week_stats in weeks.items():
+        if not _is_valid_week_key(week_key):
+            continue
+        if week_key > max_week_key:
+            continue
+        if last_sent_week and week_key <= last_sent_week:
+            continue
+        if not _is_non_empty_period_stats(week_stats):
+            continue
+        candidate_keys.append(week_key)
+    if not candidate_keys:
+        return None
+    return min(candidate_keys)
+
+
 def _save_weekly_state(state_file, state):
     state_path = Path(state_file)
     state_path.parent.mkdir(parents=True, exist_ok=True)
@@ -214,11 +285,14 @@ def maybe_prepare_weekly_digest(state_file, digest_weekday, now=None):
         return None
 
     state = _load_weekly_state(state_file)
-    target_week_key = _iso_week_key(now - timedelta(days=7))
-    if state.get("last_sent_week") == target_week_key:
+    latest_eligible_week_key = _iso_week_key(now - timedelta(days=7))
+    target_week_key = _next_weekly_digest_week_key(state, latest_eligible_week_key)
+    if target_week_key is None:
         return None
 
-    week_stats = state.get("weeks", {}).get(target_week_key, _empty_week_stats())
+    week_stats = state.get("weeks", {}).get(target_week_key)
+    if week_stats is None:
+        return None
     subject = f"Errol weekly digest ({target_week_key})"
     body = format_weekly_digest(target_week_key, week_stats)
     return {

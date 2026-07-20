@@ -60,6 +60,30 @@ def test_weekly_digest_targets_previous_week(tmp_path):
     assert "Processed emails  : 4" in digest["body"]
 
 
+def test_weekly_digest_skips_empty_week_and_sends_next_non_empty_week(tmp_path):
+    state_file = str(tmp_path / "weekly_state.json")
+    record_run_in_weekly_state(
+        state_file,
+        RunStats(processed=0, spam=0, irrelevant=0, lead=0, errors=0, lead_scores=[]),
+        now=datetime(2026, 2, 9, 10, 0, 0),  # 2026-W07
+    )
+    record_run_in_weekly_state(
+        state_file,
+        RunStats(processed=2, spam=1, irrelevant=1, lead=0, errors=0, lead_scores=[]),
+        now=datetime(2026, 2, 16, 10, 0, 0),  # 2026-W08
+    )
+
+    digest = maybe_prepare_weekly_digest(
+        state_file=state_file,
+        digest_weekday=0,
+        now=datetime(2026, 2, 23, 9, 0, 0),  # Monday, targets <= 2026-W08
+    )
+
+    assert digest is not None
+    assert digest["subject"] == "Errol weekly digest (2026-W08)"
+    assert "Processed emails  : 2" in digest["body"]
+
+
 def test_daily_digest_aggregates_multiple_runs_and_targets_previous_day(tmp_path):
     state_file = str(tmp_path / "daily_state.json")
     day_run_1 = datetime(2026, 2, 24, 8, 0, 0)
@@ -126,4 +150,40 @@ def test_daily_digest_waits_for_send_hour(tmp_path):
         send_hour=8,
         now=datetime(2026, 2, 25, 7, 59, 0),
     )
+    assert digest is None
+
+
+def test_daily_digest_skips_missing_yesterday_and_sends_latest_recorded_non_empty_day(tmp_path):
+    state_file = str(tmp_path / "daily_state.json")
+    record_run_in_daily_state(
+        state_file,
+        RunStats(processed=3, spam=1, irrelevant=2, lead=0, errors=0, lead_scores=[]),
+        now=datetime(2026, 2, 25, 12, 0, 0),
+    )
+
+    digest = maybe_prepare_daily_digest(
+        state_file=state_file,
+        send_hour=8,
+        now=datetime(2026, 2, 27, 8, 0, 0),
+    )
+
+    assert digest is not None
+    assert digest["subject"] == "Errol daily digest (2026-02-25)"
+    assert "Processed emails  : 3" in digest["body"]
+
+
+def test_daily_digest_does_not_send_empty_day(tmp_path):
+    state_file = str(tmp_path / "daily_state.json")
+    record_run_in_daily_state(
+        state_file,
+        RunStats(processed=0, spam=0, irrelevant=0, lead=0, errors=0, lead_scores=[]),
+        now=datetime(2026, 2, 24, 12, 0, 0),
+    )
+
+    digest = maybe_prepare_daily_digest(
+        state_file=state_file,
+        send_hour=8,
+        now=datetime(2026, 2, 25, 8, 0, 0),
+    )
+
     assert digest is None

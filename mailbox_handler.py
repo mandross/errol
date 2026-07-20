@@ -22,10 +22,11 @@ def fetch_email_ids(mailbox, folder):
     if status != "OK":
         return [], f"IMAP: failed to select mailbox folder '{folder}'."
 
-    status, id_data = mailbox.search(None, "ALL")
+    # Use UIDs so IDs stay valid after move/expunge renumbers sequence numbers.
+    status, id_data = mailbox.uid("SEARCH", None, "ALL")
     if status != "OK":
         return [], "IMAP: failed to search messages."
-    if not id_data:
+    if not id_data or not id_data[0]:
         return [], None
 
     return id_data[0].split(), None
@@ -36,7 +37,7 @@ def fetch_email_by_id(
     email_id,
 ):
     try:
-        status, msg_data = mailbox.fetch(email_id.decode("ascii"), "(RFC822)")
+        status, msg_data = mailbox.uid("FETCH", email_id.decode("ascii"), "(RFC822)")
         if (
             status != "OK"
             or not msg_data
@@ -149,15 +150,16 @@ def move_email_to_folder(
     target_folder,
 ):
     try:
-        copy_status, _ = mailbox.copy(email_id.decode("ascii"), target_folder)
+        uid = email_id.decode("ascii")
+        copy_status, _ = mailbox.uid("COPY", uid, target_folder)
         if copy_status != "OK":
             return f"IMAP: failed to copy email id={email_id!r} to '{target_folder}'."
-        store_status, _ = mailbox.store(email_id.decode("ascii"), "+FLAGS", "\\Deleted")
+        store_status, _ = mailbox.uid("STORE", uid, "+FLAGS", "\\Deleted")
         if store_status != "OK":
             return f"IMAP: failed to mark email id={email_id!r} deleted after copy."
         expunge_status, _ = mailbox.expunge()
         if expunge_status != "OK":
             return f"IMAP: failed to expunge email id={email_id!r} after move."
-    except (imaplib.IMAP4.error, UnicodeDecodeError) as exc:    
+    except (imaplib.IMAP4.error, UnicodeDecodeError) as exc:
         return f"IMAP: failed moving email id={email_id!r} to '{target_folder}': {exc}"
     return None
